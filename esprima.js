@@ -1338,6 +1338,11 @@
                 range: [pos, index],
                 loc: loc
             });
+            if (extra.saxCallback) {
+                if (extra.tokens.length > 1000)
+                    extra.tokens = extra.tokens.slice(-10);
+                extra.saxCallback.call(null, filterTokenLocation(extra.tokens[extra.tokens.length - 1]));
+            }
         }
 
         return regex;
@@ -1495,6 +1500,11 @@
                 };
             }
             extra.tokens.push(entry);
+            if (extra.saxCallback) {
+                if (extra.tokens.length > 1000)
+                    extra.tokens = extra.tokens.slice(-10);
+                extra.saxCallback.call(null, filterTokenLocation(extra.tokens[extra.tokens.length - 1]));
+            }
         }
 
         return token;
@@ -3895,30 +3905,31 @@
         return node.finishProgram(body);
     }
 
-    function filterTokenLocation() {
-        var i, entry, token, tokens = [];
-
-        for (i = 0; i < extra.tokens.length; ++i) {
-            entry = extra.tokens[i];
-            token = {
-                type: entry.type,
-                value: entry.value
+    function filterTokenLocation(entry) {
+        var token = {
+            type: entry.type,
+            value: entry.value
+        };
+        if (entry.regex) {
+            token.regex = {
+                pattern: entry.regex.pattern,
+                flags: entry.regex.flags
             };
-            if (entry.regex) {
-                token.regex = {
-                    pattern: entry.regex.pattern,
-                    flags: entry.regex.flags
-                };
-            }
-            if (extra.range) {
-                token.range = entry.range;
-            }
-            if (extra.loc) {
-                token.loc = entry.loc;
-            }
-            tokens.push(token);
         }
+        if (extra.range) {
+            token.range = entry.range;
+        }
+        if (extra.loc) {
+            token.loc = entry.loc;
+        }
+        return token;
+    }
 
+    function filterTokensLocation() {
+        var i, tokens = [];
+
+        for (i = 0; i < extra.tokens.length; ++i)
+            tokens.push(filterTokenLocation(extra.tokens[i]));
         extra.tokens = tokens;
     }
 
@@ -3971,6 +3982,9 @@
         if (typeof options.tolerant === 'boolean' && options.tolerant) {
             extra.errors = [];
         }
+        if (typeof options.saxCallback === 'function') {
+            extra.saxCallback = options.saxCallback;
+        }
 
         try {
             peek();
@@ -3994,7 +4008,7 @@
                 }
             }
 
-            filterTokenLocation();
+            filterTokensLocation();
             tokens = extra.tokens;
             if (typeof extra.comments !== 'undefined') {
                 tokens.comments = extra.comments;
@@ -4063,6 +4077,9 @@
                 extra.trailingComments = [];
                 extra.leadingComments = [];
             }
+            if (typeof options.saxCallback === 'function' && !options.tokens) {
+                extra.saxCallback = options.saxCallback;
+            }
         }
 
         try {
@@ -4071,7 +4088,7 @@
                 program.comments = extra.comments;
             }
             if (typeof extra.tokens !== 'undefined') {
-                filterTokenLocation();
+                filterTokensLocation();
                 program.tokens = extra.tokens;
             }
             if (typeof extra.errors !== 'undefined') {
